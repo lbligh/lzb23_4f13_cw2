@@ -51,3 +51,6 @@ Thumbs.db
 test.c
 test.out
 test.py
+
+#plots 
+plots/*
