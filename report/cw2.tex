@@ -18,192 +18,159 @@
 \usepackage{listings}
 \usepackage{circuitikz}
 \usepackage{hyperref}
-
 \usepackage[style=chicago-authordate]{biblatex} %Imports biblatex package
 
 \geometry{a4paper} % orletter or a5paper or ... etc %
 \geometry{left=2.5cm, right=2.5cm, bottom=2.5cm, top = 2.5cm}
-
+\setlength{\intextsep}{5pt} % Vertical space above & below [h] floats
+\setlength{\textfloatsep}{5pt} % Vertical space below (above) [t] ([b]) floats
+\setlength{\abovecaptionskip}{5pt}
+\setlength{\belowcaptionskip}{5pt}
 
 \newenvironment{Figure}
   {\par\medskip\noindent\minipage{\linewidth}}
   {\endminipage\par\medskip}
 
-\title[4F13 - Coursework \#1: Gaussian Processes]{4F13 - Coursework \#1: Gaussian Processes}
+
 \author{CCN: 5654F}
-\date{Thursday 2nd November 2023} % delete this line to display the current date4340-
+\title[4F13 - Coursework \#2: Probabilistic Ranking]{\vspace{-.4in}4F13 - Coursework \#2: Probabilistic Ranking\vspace{-.2in}}
+\date{Wednesday 15th November 2023} % delete this line to display the current date4340-
 
 
 %%% BEGIN DOCUMENT
 \begin{document}
-
 \maketitle
+\vspace{-.4in}
+\section{Task A: Gibbs Sampling} \label{sec:a}
+The code in \verb|gibbsrank.py| was completed by adding functionality to generate the sample skills given performance differences by adding line 1 of Listing \ref{lst:cw2a} to the first uncompleted loop over all the players (which negates the skill difference of lost games from those won). Lines 4 onwards of the same Listing were then added to build the \verb|iS| matrix, by adding $\pm1$ to each entry to match the form of the covariance matrix in the lecture notes\footnote{\label{fn:l_notes}CUED 4F13 Lecture notes \href{Uhttps://mlg.eng.cam.ac.uk/teaching/4f13/2324/RL}{(course site)}}.
 
-\section{Task A}
-The data provided in \verb|cw1a.m| was loaded and the required covariance function (squared exponential) was selected. The log hyper-parameters were initialised as instructed and then optimised by minimizing the negative log marginal likelihood (NLML), as shown in line 2 of listing \ref{lst:cw1a}. The mean and standard deviations at each test data point are calculated in line 5, and the 95\% confidence interval (calculated as $\mu \pm 2\sigma$) is calculated in line 8. The mean, data, and confidence intervals are then plotted in Figure \ref{fig:taska}. 
-
-\begin{listing}[H]
-    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
-        hyp.mean = []; hyp.cov = [-1,0]; hyp.lik = 0;
-        [hyp_optimized, fX] = minimize(hyp, @gp, -100, @infGaussLik, meanfunc, covfunc, likfunc, x, y);
+\begin{listing}[h]
+    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{python3}
+        m[p] = sum(t[np.where(G[:, 0] == p)]) - sum(
+                t[np.where(G[:, 1] == p)]
+            )
         
-        % get mean and variance at test locations
-        [mu, sigma] = gp(hyp_optimized, @infGaussLik, meanfunc, covfunc, likfunc, x, y, x_test);   
+        winner = G[g, 0]
+        loser = G[g, 1]
 
-        % get 95% conf interval -> = mean +/- 2*sigma
-        f = [mu+2*sqrt(sigma); flipdim(mu-2*sqrt(sigma),1)]; 
+        iS[winner, winner] += 1
+        iS[loser, loser] += 1
+        iS[winner, loser] -= 1
+        iS[loser, winner] -= 1
     \end{minted}
-    \caption{Task A code excerpts} \label{lst:cw1a}
+    \caption{Task A code excerpts} \label{lst:cw2a}
 \end{listing}
 
-\begin{figure}[ht]
-  \centering
-  \begin{subfigure}[b]{0.49\textwidth}
+\begin{figure}[h]
     \centering
-    \includegraphics[width=0.99\textwidth]{pics/taska.png}
-    \caption{Task A, original local optima}
-    \label{fig:taska}
-  \end{subfigure}
-  \hfill
-  \begin{subfigure}[b]{0.49\textwidth}
-      \centering
-      \includegraphics[width=0.99\textwidth]{pics/taska.png}
-    \caption{Task B, new local optima}
-    \label{fig:taskb}
-    \end{subfigure}
-    \caption{CovSEiso trained Gaussian Processes}
-\end{figure} \label{fig:taskab}
-
-
-
-
-The optimized hyper-parameters are found by the taking the exponential of the log hyper-parameters used in the model. The local optimum found from the starting point given had \verb|exp_cov = [0.1282, 0.8970]| and \verb|exp_lik = 0.1178|. 0.1282 is the characteristic length scale of the squared exponential covariance function, which describes the radius of the sphere of influence for each datapoint. 0.8970 is the signal variance, which affects how much an individual point contributes to the model - this is fitted so that the model fits to the points but does not overfit to outliers. 0.1178 is the noise variance of the Gaussian likelihood function.
-
-The error bars are a function of the predictive variance, and therefore get wider as the data points get further apart. This is intuitive from the squared exponential covariance function, as it returns a high covariance for points which are close together in x space. There is an upper limit on the width of the confidence region, as when points are completely uncorrelated the signal variance and likelihood function variance still provide a variance. This suggests that the limit in width is given by $4\times\sqrt{0.1178^{2} + 0.8970^{2}} = 3.62$ (squared summation of variances) which visually can be seen to be true. The small value of the length-scale also explains the rapid periodic section in the centre of the plot.
-
-\section{Task B}
-The same code is used as in Task A, just with different initial settings of the parameters. If the log length-scale is now set to 2, as in listing \ref{lst:cw1b}, a very different process is trained. The resulting Gaussian Process is shown in Figure \ref{fig:taskb}. This change in the initial parameters allows the training process to find a different local optima. 
-
-\begin{listing}[H]
-    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
-        hyp.mean = []; hyp.cov = [2,0]; hyp.lik = 0;
-
-        nlml = gp(hyp, @infGaussLik, meanfunc, covfunc, likfunc, x, y);
-    \end{minted}
-    \caption{Task B code excerpts} \label{lst:cw1b}
-\end{listing}
-
-Here the length-scale is initialised to 7.389 which is greater than the range of the dataset in x-space. This leads the model to treat all the data as noise around a mean value, and all the periodic effects are ignored. The existence of multiple local optima can be found by plotting the negative log marginal likelihood for multiple values of length scale and noise variance, as seen in Figure \ref{fig:taskb2}. This is done by running line 3 of Listing \ref{lst:cw1b} in a loop of different values of the length scale and noise variance to generate a matrix of values for the NLML. The figure shows the two local optima, one distinct at $\sim(-2, -2)$, and a much less distinct one at around $\sim(2, -0.5)$. These are the two optima found by Task A and B respectively. The NLMLs for the two are 11.90 and 78.22 respectively, which means that the more distinct optimum from Task A has a likelihood $6.345\times10^{28}$ more likely than that of Task B. Therefore the fit from Task A is much better. 
-
-\begin{figure}[]
-    \centering
-    \includegraphics[width=0.99\textwidth]{pics/taskb2.png}
-    \caption{NLML Space}
-    \label{fig:taskb2}
-\end{figure}
-
-\section{Task C}
-This task is done purely by changing the initialisation of the covariance function from that of Task A to as shown in line 1 of Listing \ref{lst:cw1c} (with the rest of the code remaining identical), to use a period covariance function instead of a squared exponential form. This produces the model shown in Figure \ref{fig:taskc}. 
-
-
-\begin{listing}[H]
-    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
-        covfunc = {@covPeriodic}; hyp.cov = [0,0,0];
-
-        y_preds = gp(hyp_optimized, @infGaussLik, meanfunc, covfunc, likfunc, x, y, x);
-        resid(i) = y_preds(i) - y(i);
-    \end{minted}
-    \caption{Task C code excerpts} \label{lst:cw1c}
-\end{listing}
-
-\begin{figure}[ht]
-    \centering
-    \begin{subfigure}[b]{0.65\textwidth}
+    \begin{subfigure}[b]{0.62\textwidth}
         \centering
-        \includegraphics[width=0.99\textwidth]{pics/taskc.png}
-        \caption{Periodic Covariance Gaussian Process}
-        \label{fig:taskc}
+        \includegraphics[width=0.99\textwidth]{../plots/Ta_sample_skills.png}
+        \caption{Player Skills}
+        \label{fig:ta_skills}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[b]{0.34\textwidth}
+    \begin{subfigure}[b]{0.37\textwidth}
         \centering
-        \includegraphics[width=0.99\textwidth]{pics/taskc2.png}
-        \caption{Residuals}
-        \label{fig:taskc2}
+        \includegraphics[width=0.99\textwidth]{../plots/Ta_acorr.png}
+        \caption{Player Autocorrelations}
+        \label{fig:ta_autocor}
     \end{subfigure}
-    \caption{CovPeriodic trained Gaussian Processes}
-\end{figure} \label{fig:taskcall}
+    \caption{Task A Figures}
+\end{figure} \label{fig:taska_all}
 
-It is clear from Figure \ref{fig:taskc} that the model is more confident about the data, as - even in the areas where the data points are close together - the 95\% confidence interval is smaller than in the model from Task A. This fact is also represented by the likelihood of the model. The NLML for this model is -35.25, which shows this model has a likelihood a factor of $2.04\times10^{20}$ higher than that of Task A. The model is more confident in the areas with sparser data than Task A also, as it is predicted by the periodicity of the covariance function. 
+The Gibbs sampler was then run for 1100 iterations using the provided python notebook, and 4 random players skills were plotted across the first 200 iterations: Figure \ref{fig:ta_skills}. The data is noisy but is clearly not completely independent as each skill point stays fairly close to the previous point. The autocorrelation for each player for 25 steps is plotted in Figure \ref{fig:ta_autocor}, which shows that an autocorrelation time of at least 10 samples is needed for the autocorrelation over the skills to be 0 for all athletes. Plotting the average population mean and variance also shows that the burn-in time (time for the chain to converge to the distribution) is lower than the 10 samples needed for the samples to become independent. Therefore the first 10 samples need to be discarded.
 
-These factors all together imply the data is quite likely to have been generated with periodic function. This can be checked by looking at the residuals of the model by calculating the model predicted values for each x value in the training set and then finding the difference between the model value and the true value (lines 3 and 4 in Listing \ref{lst:cw1c}). Figure \ref{fig:taskc2} shows these residuals, and it can be seen that they look independent and normally distributed. If the initial model had not been periodic in nature the residuals would appear to follow a distribution correcting for the error in the model assumptions, i.e. would have a dependence on $x$. As this is not the case it is safe to assume that the data was periodic in nature to begin with. 
+% \begin{figure}[]
+%     \centering
+%     \includegraphics[width=0.99\textwidth]{../plots/Ta_sample_skills.png}
+%     \caption{Player Skills}
+%     % \label{fig:ta_skills}
+% \end{figure}
 
-\section{Task D}
-The mean, likelihood and covariance functions were set up as described in the question.The covariance and mean matrices were then found using the commands from lines 1 and 2 of Listing \ref{lst:cw1d}. The $y$ values are found using the method described in the lecture notes, by using the Cholesky Decomposition of the covariance matrix and an array of independent normally distributed values (lines 6 and 7). Before this however a very small ($1\times10^{-6}$) multiple of the identity matrix is added to the covariance matrix to ensure that it is positive-definite, a requirement of the Cholesky Decomposition. Three sample functions of y for differently generated values of z are plotted in Figure \ref{fig:taskd}
 
+\section{Task B: Message Passing} \label{sec:b}
+Convergence occurs when the parameters \emph{converge} to a constant value (the true value according to the algorithm). For Gibbs Sampling this is when the the Markov chain converges to a stationary probability distribution (the joint skill distribution). For message passing/EP this occurs when a stable graph is reached, each iteration of messages passed does not affect the mean and precision of each vertex. In Section \ref{sec:a} we saw that the \verb|max|(burn-in time, autocorrelation time) was $\sim$10 samples. A new function was first added to the \verb|eprank.py| that returns the means and precisions at each iteration, which allowed graphs of the change in mean and precision from their final values to be produced as Figure \ref{fig:taskb_all}. These show a more rapid convergence than the Gibbs sampling method, with the player means and precisions each reaching their final values in only $\sim$6 iterations, a 40\% improvement over the method in Section \ref{sec:a}.
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[b]{0.495\textwidth}
+        \centering
+        \includegraphics[width=0.99\textwidth]{../plots/change_in_mean_normal.png}
+        \caption{Player Mean Convergence}
+        \label{fig:tb_means}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.495\textwidth}
+        \centering
+        \includegraphics[width=0.99\textwidth]{../plots/change_in_precision_normal.png}
+        \caption{Player Precision Convergence}
+        \label{fig:tb_precs}
+    \end{subfigure}
+    \caption{Task B Figures}
+\end{figure} \label{fig:taskb_all}
 
-\begin{listing}[H]
-    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
-        K = feval(covfunc{:}, hyp.cov, x);
-        mu = feval(meanfunc, hyp.mean, x);
+\section{Task C: Player Ranking using EP}
+Players $ i,j $ have skills $ w_i, w_j $. $ p(w_i > w_j) $ can be easily calculated using the definitions in the lecture notes\footnote{see footnote \ref{fn:l_notes}} as in Equation \ref{eqn:skilldiff}. Similarly, a player wins against another in this model if the skill difference plus a noise $ n \sim \mathcal{N}(0,1)$ is greater than zero for $i$, or less than zero for $j$. Therefore the probability of $i$ winning is given by Equation \ref{eqn:win}.
 
-        K = K + 1e-6*eye(200);
+\begin{eqnarray}
+    p(w_i > w_j) = p(w_j-w_i < 0) =\Phi \left(\frac{\mu_i - \mu_j}{\sqrt{\lambda_i^{-1} + \lambda_j^{-1}}}\right) \\ \label{eqn:skilldiff}
+    p(w_i - w_j + n > 0) = \Phi \left(\frac{\mu_i - \mu_j}{\sqrt{\lambda_i^{-1} + \lambda_j^{-1} + 1}}\right) \label{eqn:win}
+\end{eqnarray}
 
-        z1 = randn(n, 1);
-        y1 = chol(K)'*z1 + mu;
+\begin{listing}[h]
+    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{python3}
+        prob_has_better_skill = 1.0 - norm.cdf(
+            0, mean_differences, vars_sums**0.5
+        )
+
+        prob_win = 1.0 - norm.cdf(
+            0, mean_differences, (vars_sums + 1.0) ** 0.5
+        )
     \end{minted}
-    \caption{Task D code excerpts} \label{lst:cw1d}
+    \caption{Task C code excerpts} \label{lst:cw2c}
 \end{listing}
 
+Lines 1 and 4 of Listing \ref{lst:cw2c} are therefore used to calculate a matrix showing the probabilities of the top 4 ranked players (from the lecture notes' ranking\footnote{see footnote \ref{fn:l_notes}}) a. having a higher skill than the others, and b. their probability of winning if playing against the other players. These lines just demonstrate the equations from the previous paragraph, using the \verb|scipy.stats.norm.cdf| function for $\Phi$. The results are shown in Tables \ref{tab:skill_prob} and \ref{tab:win_prob} respectively.
+\begin{table}
+    \centering{}
+    \begin{minipage}[t]{0.495\textwidth}
+        \begin{center}
+            \begin{tabular}{lcccc}\toprule
+                ---         & D           & N           & F           & M           \\ \midrule
+                Djokovic(D) & \num{0.500} & \num{0.940} & \num{0.909} & \num{0.985} \\
+                Nadal(N)    & \num{0.060} & \num{0.500} & \num{0.427} & \num{0.767} \\
+                Federer(F)  & \num{0.091} & \num{0.573} & \num{0.500} & \num{0.811} \\
+                Murray(M)   & \num{0.015} & \num{0.233} & \num{0.189} & \num{0.500} \\  \bottomrule
+            \end{tabular}%
+            \par\end{center}
+        \caption{p(Higher Skill)} \label{tab:skill_prob}
+        %
+    \end{minipage}%
+    \begin{minipage}[t]{0.495\textwidth}%
+        \begin{center}
+            \begin{tabular}{lcccc} \toprule
+                ---         & D           & N           & F           & M           \\ \midrule
+                Djokovic(D) & \num{0.500} & \num{0.655} & \num{0.638} & \num{0.720} \\
+                Nadal(N)    & \num{0.345} & \num{0.500} & \num{0.482} & \num{0.573} \\
+                Federer(F)  & \num{0.362} & \num{0.518} & \num{0.500} & \num{0.591} \\
+                Murray(M)   & \num{0.280} & \num{0.427} & \num{0.409} & \num{0.500} \\ \bottomrule
+            \end{tabular}
+            \par\end{center}
+        \caption{p(Win)} \label{tab:win_prob}
+        %
+    \end{minipage}%
+    \label{tab:taskc_tabs}
+\end{table}
 
-\begin{figure}[]
-    \centering
-    \includegraphics[width=0.9\textwidth]{pics/taskd.png}
-    \caption{Task D Generated Functions}
-    \label{fig:taskd}
-\end{figure}
+It can clearly be seen that a player with higher expected skill than another is always expected to win the match between them, and the converse. However, the probability of winning is much lower than the probability of having a higher skill due to the additional match variance term $n$ (the performance noise). This adds to the model the fact that a player can have an ``off match'', and aids in training by making the model less confident in attributing skill to the winning player of each match.
 
-The covariance function is formed of by the product of a squared exponential (SE)covariance function and a periodic covariance function. As can be seen, the periodic nature of the function holds the form of the function consistent over each period, whereas the squared exponential term allows for fluctuations in the amplitude of the oscillations each period. The length scale for the SE function is set to $exp(2)=7.39$, explaining why the form of each period changes only slowly across the plot, while the short length scale of the periodic function ($exp(-0.5) = 0.607$) allows for the steep gradients within each period.
+
+\section{Task D: Nadal and Federer Skill Comparison}
+\subsection{Approximation of Marginal Skills by Gaussians}
+
+
 
 \section{Task E}
-The two covariance functions were set up in a very similar method as before, with the hyper-parameters for the composite covariance function being set up with independent normally distributed values as suggested in the question. Lines 1 and 2 of Listing \ref{lst:cw1e} shows the initialisation of the composite covariance function while lines 4 and 5 show how the grid of test points was set up. Both models were then optimised in the same manner as before to fit the data. 
-
-\begin{listing}[H]
-    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
-        covfunc = {@covSum, {@covSEard, @covSEard}};
-        hyp.cov = 0.1*randn(6, 1);
-
-        x_test = linspace(-4,4,n_data); y_test = linspace(-4,4,n_data);
-        x_grid_test = apxGrid('expand',{x_test',y_test'});
-
-    \end{minted}
-    \caption{Task D code excerpts} \label{lst:cw1e}
-\end{listing}
-
-
-\begin{figure}[]
-    \centering
-    \includegraphics[width=0.8\textwidth]{pics/taskemean.png}
-    \caption{Mean of Gaussian Models for Task E}
-    \label{fig:taskemean}
-\end{figure}
-
-\begin{figure}[]
-    \centering
-    \includegraphics[width=0.8\textwidth]{pics/taskeconf.png}
-    \caption{Confidence Intervals of Gaussian Models for Task E}
-    \label{fig:taskeconf}
-\end{figure}
-
-\begin{figure}[]
-    \centering
-    \includegraphics[width=0.8\textwidth]{pics/taskewidth.png}
-    \caption{Conf. Int. Width of Gaussian Models for Task E}
-    \label{fig:taskewidth}
-\end{figure}
-
-
-Figures \ref{fig:taskemean}, \ref{fig:taskeconf} and \ref{fig:taskewidth} show the mean, confidence intervals, and width of the confidence intervals (inter-95th percentile range) for both models. The two mean functions look similar but the NLMLs of both models show that the composite model is far better. The NMLMs are -19.22 and -66.32 for the simple and composite covariance function models respectively. This shows that the composite model has a marginal likelihood $\exp(66.32-19.22) =2.85\times10^{20}$ times better. The single length-scale hyper-parameter in the simple model enforces symmetry between the two input axes, resulting in an inevitable compromise in model accuracy. The composite model has a length-scale for both axes, allowing the model to train over both directions and get a more accurate model. This is a trade off in terms of model complexity however, as the composite model increases number of hyper-parameters ($3\rightarrow6$). This increase in model complexity is more than compensated for by the large increase in the marginal likelihood, and therefore the composite model is still much preferred. 
 
 
 % \renewcommand{\thepage}{A\arabic{page}} 
