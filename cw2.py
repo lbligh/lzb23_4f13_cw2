@@ -19,4 +19,3 @@ def sorted_barplot(P, W):
     plt.yticks(np.linspace(0, M, M), labels=sorted_names[:, 0])
     plt.ylim([-2, 109])
     plt.show()
-
