@@ -54,3 +54,8 @@ test.py
 
 #plots 
 plots/*
+
+#tex
+report/*
+!report/*.tex
+!report/*.pdf
