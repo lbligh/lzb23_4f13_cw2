@@ -1,0 +1,248 @@
+\documentclass[11pt]{amsart}
+\usepackage{geometry} % see geometry.pdf on how tolay out the page. There's lots.
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{siunitx}
+\usepackage{fancyhdr}
+\usepackage{multicol}
+\usepackage{graphicx}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{csquotes}
+\usepackage{pdflscape}
+\usepackage[toc,page]{appendix}
+\usepackage{float}
+\usepackage{sidecap}
+\usepackage{minted}
+\usepackage{listings}
+\usepackage{circuitikz}
+\usepackage{hyperref}
+
+\usepackage[style=chicago-authordate]{biblatex} %Imports biblatex package
+
+\geometry{a4paper} % orletter or a5paper or ... etc %
+\geometry{left=2.5cm, right=2.5cm, bottom=2.5cm, top = 2.5cm}
+
+
+\newenvironment{Figure}
+  {\par\medskip\noindent\minipage{\linewidth}}
+  {\endminipage\par\medskip}
+
+\title[4F13 - Coursework \#1: Gaussian Processes]{4F13 - Coursework \#1: Gaussian Processes}
+\author{CCN: 5654F}
+\date{Thursday 2nd November 2023} % delete this line to display the current date4340-
+
+
+%%% BEGIN DOCUMENT
+\begin{document}
+
+\maketitle
+
+\section{Task A}
+The data provided in \verb|cw1a.m| was loaded and the required covariance function (squared exponential) was selected. The log hyper-parameters were initialised as instructed and then optimised by minimizing the negative log marginal likelihood (NLML), as shown in line 2 of listing \ref{lst:cw1a}. The mean and standard deviations at each test data point are calculated in line 5, and the 95\% confidence interval (calculated as $\mu \pm 2\sigma$) is calculated in line 8. The mean, data, and confidence intervals are then plotted in Figure \ref{fig:taska}. 
+
+\begin{listing}[H]
+    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
+        hyp.mean = []; hyp.cov = [-1,0]; hyp.lik = 0;
+        [hyp_optimized, fX] = minimize(hyp, @gp, -100, @infGaussLik, meanfunc, covfunc, likfunc, x, y);
+        
+        % get mean and variance at test locations
+        [mu, sigma] = gp(hyp_optimized, @infGaussLik, meanfunc, covfunc, likfunc, x, y, x_test);   
+
+        % get 95% conf interval -> = mean +/- 2*sigma
+        f = [mu+2*sqrt(sigma); flipdim(mu-2*sqrt(sigma),1)]; 
+    \end{minted}
+    \caption{Task A code excerpts} \label{lst:cw1a}
+\end{listing}
+
+\begin{figure}[ht]
+  \centering
+  \begin{subfigure}[b]{0.49\textwidth}
+    \centering
+    \includegraphics[width=0.99\textwidth]{pics/taska.png}
+    \caption{Task A, original local optima}
+    \label{fig:taska}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.49\textwidth}
+      \centering
+      \includegraphics[width=0.99\textwidth]{pics/taska.png}
+    \caption{Task B, new local optima}
+    \label{fig:taskb}
+    \end{subfigure}
+    \caption{CovSEiso trained Gaussian Processes}
+\end{figure} \label{fig:taskab}
+
+
+
+
+The optimized hyper-parameters are found by the taking the exponential of the log hyper-parameters used in the model. The local optimum found from the starting point given had \verb|exp_cov = [0.1282, 0.8970]| and \verb|exp_lik = 0.1178|. 0.1282 is the characteristic length scale of the squared exponential covariance function, which describes the radius of the sphere of influence for each datapoint. 0.8970 is the signal variance, which affects how much an individual point contributes to the model - this is fitted so that the model fits to the points but does not overfit to outliers. 0.1178 is the noise variance of the Gaussian likelihood function.
+
+The error bars are a function of the predictive variance, and therefore get wider as the data points get further apart. This is intuitive from the squared exponential covariance function, as it returns a high covariance for points which are close together in x space. There is an upper limit on the width of the confidence region, as when points are completely uncorrelated the signal variance and likelihood function variance still provide a variance. This suggests that the limit in width is given by $4\times\sqrt{0.1178^{2} + 0.8970^{2}} = 3.62$ (squared summation of variances) which visually can be seen to be true. The small value of the length-scale also explains the rapid periodic section in the centre of the plot.
+
+\section{Task B}
+The same code is used as in Task A, just with different initial settings of the parameters. If the log length-scale is now set to 2, as in listing \ref{lst:cw1b}, a very different process is trained. The resulting Gaussian Process is shown in Figure \ref{fig:taskb}. This change in the initial parameters allows the training process to find a different local optima. 
+
+\begin{listing}[H]
+    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
+        hyp.mean = []; hyp.cov = [2,0]; hyp.lik = 0;
+
+        nlml = gp(hyp, @infGaussLik, meanfunc, covfunc, likfunc, x, y);
+    \end{minted}
+    \caption{Task B code excerpts} \label{lst:cw1b}
+\end{listing}
+
+Here the length-scale is initialised to 7.389 which is greater than the range of the dataset in x-space. This leads the model to treat all the data as noise around a mean value, and all the periodic effects are ignored. The existence of multiple local optima can be found by plotting the negative log marginal likelihood for multiple values of length scale and noise variance, as seen in Figure \ref{fig:taskb2}. This is done by running line 3 of Listing \ref{lst:cw1b} in a loop of different values of the length scale and noise variance to generate a matrix of values for the NLML. The figure shows the two local optima, one distinct at $\sim(-2, -2)$, and a much less distinct one at around $\sim(2, -0.5)$. These are the two optima found by Task A and B respectively. The NLMLs for the two are 11.90 and 78.22 respectively, which means that the more distinct optimum from Task A has a likelihood $6.345\times10^{28}$ more likely than that of Task B. Therefore the fit from Task A is much better. 
+
+\begin{figure}[]
+    \centering
+    \includegraphics[width=0.99\textwidth]{pics/taskb2.png}
+    \caption{NLML Space}
+    \label{fig:taskb2}
+\end{figure}
+
+\section{Task C}
+This task is done purely by changing the initialisation of the covariance function from that of Task A to as shown in line 1 of Listing \ref{lst:cw1c} (with the rest of the code remaining identical), to use a period covariance function instead of a squared exponential form. This produces the model shown in Figure \ref{fig:taskc}. 
+
+
+\begin{listing}[H]
+    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
+        covfunc = {@covPeriodic}; hyp.cov = [0,0,0];
+
+        y_preds = gp(hyp_optimized, @infGaussLik, meanfunc, covfunc, likfunc, x, y, x);
+        resid(i) = y_preds(i) - y(i);
+    \end{minted}
+    \caption{Task C code excerpts} \label{lst:cw1c}
+\end{listing}
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.65\textwidth}
+        \centering
+        \includegraphics[width=0.99\textwidth]{pics/taskc.png}
+        \caption{Periodic Covariance Gaussian Process}
+        \label{fig:taskc}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.34\textwidth}
+        \centering
+        \includegraphics[width=0.99\textwidth]{pics/taskc2.png}
+        \caption{Residuals}
+        \label{fig:taskc2}
+    \end{subfigure}
+    \caption{CovPeriodic trained Gaussian Processes}
+\end{figure} \label{fig:taskcall}
+
+It is clear from Figure \ref{fig:taskc} that the model is more confident about the data, as - even in the areas where the data points are close together - the 95\% confidence interval is smaller than in the model from Task A. This fact is also represented by the likelihood of the model. The NLML for this model is -35.25, which shows this model has a likelihood a factor of $2.04\times10^{20}$ higher than that of Task A. The model is more confident in the areas with sparser data than Task A also, as it is predicted by the periodicity of the covariance function. 
+
+These factors all together imply the data is quite likely to have been generated with periodic function. This can be checked by looking at the residuals of the model by calculating the model predicted values for each x value in the training set and then finding the difference between the model value and the true value (lines 3 and 4 in Listing \ref{lst:cw1c}). Figure \ref{fig:taskc2} shows these residuals, and it can be seen that they look independent and normally distributed. If the initial model had not been periodic in nature the residuals would appear to follow a distribution correcting for the error in the model assumptions, i.e. would have a dependence on $x$. As this is not the case it is safe to assume that the data was periodic in nature to begin with. 
+
+\section{Task D}
+The mean, likelihood and covariance functions were set up as described in the question.The covariance and mean matrices were then found using the commands from lines 1 and 2 of Listing \ref{lst:cw1d}. The $y$ values are found using the method described in the lecture notes, by using the Cholesky Decomposition of the covariance matrix and an array of independent normally distributed values (lines 6 and 7). Before this however a very small ($1\times10^{-6}$) multiple of the identity matrix is added to the covariance matrix to ensure that it is positive-definite, a requirement of the Cholesky Decomposition. Three sample functions of y for differently generated values of z are plotted in Figure \ref{fig:taskd}
+
+
+\begin{listing}[H]
+    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
+        K = feval(covfunc{:}, hyp.cov, x);
+        mu = feval(meanfunc, hyp.mean, x);
+
+        K = K + 1e-6*eye(200);
+
+        z1 = randn(n, 1);
+        y1 = chol(K)'*z1 + mu;
+    \end{minted}
+    \caption{Task D code excerpts} \label{lst:cw1d}
+\end{listing}
+
+
+\begin{figure}[]
+    \centering
+    \includegraphics[width=0.9\textwidth]{pics/taskd.png}
+    \caption{Task D Generated Functions}
+    \label{fig:taskd}
+\end{figure}
+
+The covariance function is formed of by the product of a squared exponential (SE)covariance function and a periodic covariance function. As can be seen, the periodic nature of the function holds the form of the function consistent over each period, whereas the squared exponential term allows for fluctuations in the amplitude of the oscillations each period. The length scale for the SE function is set to $exp(2)=7.39$, explaining why the form of each period changes only slowly across the plot, while the short length scale of the periodic function ($exp(-0.5) = 0.607$) allows for the steep gradients within each period.
+
+\section{Task E}
+The two covariance functions were set up in a very similar method as before, with the hyper-parameters for the composite covariance function being set up with independent normally distributed values as suggested in the question. Lines 1 and 2 of Listing \ref{lst:cw1e} shows the initialisation of the composite covariance function while lines 4 and 5 show how the grid of test points was set up. Both models were then optimised in the same manner as before to fit the data. 
+
+\begin{listing}[H]
+    \begin{minted}[linenos,breaklines,fontsize=\footnotesize]{matlab}
+        covfunc = {@covSum, {@covSEard, @covSEard}};
+        hyp.cov = 0.1*randn(6, 1);
+
+        x_test = linspace(-4,4,n_data); y_test = linspace(-4,4,n_data);
+        x_grid_test = apxGrid('expand',{x_test',y_test'});
+
+    \end{minted}
+    \caption{Task D code excerpts} \label{lst:cw1e}
+\end{listing}
+
+
+\begin{figure}[]
+    \centering
+    \includegraphics[width=0.8\textwidth]{pics/taskemean.png}
+    \caption{Mean of Gaussian Models for Task E}
+    \label{fig:taskemean}
+\end{figure}
+
+\begin{figure}[]
+    \centering
+    \includegraphics[width=0.8\textwidth]{pics/taskeconf.png}
+    \caption{Confidence Intervals of Gaussian Models for Task E}
+    \label{fig:taskeconf}
+\end{figure}
+
+\begin{figure}[]
+    \centering
+    \includegraphics[width=0.8\textwidth]{pics/taskewidth.png}
+    \caption{Conf. Int. Width of Gaussian Models for Task E}
+    \label{fig:taskewidth}
+\end{figure}
+
+
+Figures \ref{fig:taskemean}, \ref{fig:taskeconf} and \ref{fig:taskewidth} show the mean, confidence intervals, and width of the confidence intervals (inter-95th percentile range) for both models. The two mean functions look similar but the NLMLs of both models show that the composite model is far better. The NMLMs are -19.22 and -66.32 for the simple and composite covariance function models respectively. This shows that the composite model has a marginal likelihood $\exp(66.32-19.22) =2.85\times10^{20}$ times better. The single length-scale hyper-parameter in the simple model enforces symmetry between the two input axes, resulting in an inevitable compromise in model accuracy. The composite model has a length-scale for both axes, allowing the model to train over both directions and get a more accurate model. This is a trade off in terms of model complexity however, as the composite model increases number of hyper-parameters ($3\rightarrow6$). This increase in model complexity is more than compensated for by the large increase in the marginal likelihood, and therefore the composite model is still much preferred. 
+
+
+% \renewcommand{\thepage}{A\arabic{page}} 
+% \renewcommand{\thetable}{A\arabic{table}}  
+% \renewcommand{\thefigure}{A\arabic{figure}}
+% \renewcommand{\theequation}{A\arabic{equation}}
+% \setcounter{figure}{0}
+% % \setcounter{page}{0}
+% \setcounter{equation}{0}
+
+
+% \begin{appendices}
+
+
+% \clearpage
+
+
+
+% \begin{center}
+%     % \centering
+%     \includegraphics[width=0.3\textwidth]{pics/Screenshot 2023-02-07 at 21.45.49.png}
+%   \captionof{figure}{FPGA CAD Workflow \parencite{labhandout}} \label{fig:workflow}
+% %   \small\textsuperscript{Diagram taken from CUED 3B2 Lab Handout}
+% \end{center}
+
+% \clearpage
+% \section{Initial Traffic Light Timer Code} \label{sec:initcode}
+% \inputminted[linenos,breaklines]{vhdl}{../initialcode.vhdl}
+
+
+% \end{appendices}
+\end{document}
+
+
+
+
+% \begin{Figure}
+%     \centering
+%     \includegraphics[width=0.8\textwidth]{pics/FPGA_cell_example.png}
+%   \captionof{figure}{Example of a Logic Cell \parencite{fpgawiki}} \label{fig:logiccell}
+% %   \small\textsuperscript{Diagram taken from CUED 3B2 Lab Handout}
+% \end{Figure}
