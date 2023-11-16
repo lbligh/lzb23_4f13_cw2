@@ -8,6 +8,7 @@
 \usepackage{graphicx}
 \usepackage{amssymb}
 \usepackage{amsmath}
+\usepackage{mathtools}
 \usepackage{booktabs}
 \usepackage{csquotes}
 \usepackage{pdflscape}
@@ -81,13 +82,6 @@ The code in \verb|gibbsrank.py| was completed by adding functionality to generat
 
 The Gibbs sampler was then run for 1100 iterations using the provided python notebook, and 4 random players skills were plotted across the first 200 iterations: Figure \ref{fig:ta_skills}. The data is noisy but is clearly not completely independent as each skill point stays fairly close to the previous point. The autocorrelation for each player for 25 steps is plotted in Figure \ref{fig:ta_autocor}, which shows that an autocorrelation time of at least 10 samples is needed for the autocorrelation over the skills to be 0 for all athletes. Plotting the average population mean and variance also shows that the burn-in time (time for the chain to converge to the distribution) is lower than the 10 samples needed for the samples to become independent. Therefore the first 10 samples need to be discarded.
 
-% \begin{figure}[]
-%     \centering
-%     \includegraphics[width=0.99\textwidth]{../plots/Ta_sample_skills.png}
-%     \caption{Player Skills}
-%     % \label{fig:ta_skills}
-% \end{figure}
-
 
 \section{Task B: Message Passing} \label{sec:b}
 Convergence occurs when the parameters \emph{converge} to a constant value (the true value according to the algorithm). For Gibbs Sampling this is when the the Markov chain converges to a stationary probability distribution (the joint skill distribution). For message passing/EP this occurs when a stable graph is reached, each iteration of messages passed does not affect the mean and precision of each vertex. In Section \ref{sec:a} we saw that the \verb|max|(burn-in time, autocorrelation time) was $\sim$10 samples. A new function was first added to the \verb|eprank.py| that returns the means and precisions at each iteration, which allowed graphs of the change in mean and precision from their final values to be produced as Figure \ref{fig:taskb_all}. These show a more rapid convergence than the Gibbs sampling method, with the player means and precisions each reaching their final values in only $\sim$6 iterations, a 40\% improvement over the method in Section \ref{sec:a}.
@@ -109,8 +103,8 @@ Convergence occurs when the parameters \emph{converge} to a constant value (the 
     \caption{Task B Figures}
 \end{figure} \label{fig:taskb_all}
 
-\section{Task C: Player Ranking using EP}
-Players $ i,j $ have skills $ w_i, w_j $. $ p(w_i > w_j) $ can be easily calculated using the definitions in the lecture notes\footnote{see footnote \ref{fn:l_notes}} as in Equation \ref{eqn:skilldiff}. Similarly, a player wins against another in this model if the skill difference plus a noise $ n \sim \mathcal{N}(0,1)$ is greater than zero for $i$, or less than zero for $j$. Therefore the probability of $i$ winning is given by Equation \ref{eqn:win}.
+\section{Task C: Player Ranking using EP} \label{sec:c}
+If players $ i,j $ have skills $ w_i, w_j $, $ p(w_i > w_j) $ can be easily calculated using the definitions in the lecture notes\footnote{see footnote \ref{fn:l_notes}} as in Equation \ref{eqn:skilldiff}. Similarly, a player wins against another in this model if the skill difference plus a noise $ n \sim \mathcal{N}(0,1)$ is greater than zero for $i$, or less than zero for $j$. Therefore the probability of $i$ winning is given by Equation \ref{eqn:win}, where the $\lambda$s are the precisions.
 
 \begin{eqnarray}
     p(w_i > w_j) = p(w_j-w_i < 0) =\Phi \left(\frac{\mu_i - \mu_j}{\sqrt{\lambda_i^{-1} + \lambda_j^{-1}}}\right) \\ \label{eqn:skilldiff}
@@ -159,18 +153,113 @@ Lines 1 and 4 of Listing \ref{lst:cw2c} are therefore used to calculate a matrix
         \caption{p(Win)} \label{tab:win_prob}
         %
     \end{minipage}%
-    \label{tab:taskc_tabs}
 \end{table}
 
 It can clearly be seen that a player with higher expected skill than another is always expected to win the match between them, and the converse. However, the probability of winning is much lower than the probability of having a higher skill due to the additional match variance term $n$ (the performance noise). This adds to the model the fact that a player can have an ``off match'', and aids in training by making the model less confident in attributing skill to the winning player of each match.
 
 
-\section{Task D: Nadal and Federer Skill Comparison}
+\section{Task D: Nadal and Federer Skill Comparison} \label{sec:d}
 \subsection{Approximation of Marginal Skills by Gaussians}
+The parameters of each Gaussian were calculated by taking the mean and variance of the Gibbs samples after training (excluding burn-in/autocorrelation time) for each player. These are plotted in a histogram to justify the use of a Gaussian (which we expect to be the case due to the properties of the model), with the Gaussian fit alongside. This is shown in Figure \ref{fig:td_gaussian}. As expected - as he is ranked higher - Djokovic's mean skill is higher than Nadal's (1.899 vs 1.463), although the variance in the skill is higher (0.224 vs 0.188).
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=0.99\textwidth]{../plots/taskd_1.png}
+        \caption{Gaussian Marginal Skill}
+        \label{fig:td_gaussian}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=0.99\textwidth]{../plots/taskd_2.png}
+        \caption{Gaussian Joint Skill}
+        \label{fig:td_2}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=0.99\textwidth]{../plots/taskd_3.png}
+        \caption{Direct Comparison}
+        \label{fig:td_3}
+    \end{subfigure}
+    \caption{Task D Figures}
+\end{figure} \label{fig:taskd_all}
+
+\subsection{Approximation of Joint Skills by Gaussian}
+The same analysis is done, but by fitting a joint gaussian to the burned-in Gibbs samples by using \verb|numpy| to generate the covariance matrix and the means. The means are unsuprisingly the same, and the covariance matrix is shown in Equation \ref{mat:td2_cov}. A contour plot of the 2-D Gaussian Generated is shown in Figure \ref{fig:td_2}. The covariance matrix shows a small diagonal term ($\sim 0.074$) showing that the two players skills are slightly correlated.
+
+\begin{equation} \label{mat:td2_cov}
+    \Sigma =
+    \begin{bmatrix}
+        0.0367 & 0.0074 \\
+        0.0074 & 0.0474 \\
+    \end{bmatrix}
+\end{equation}
+
+\subsection{Direct Skill Comparison from samples}
+In this method the burned-in skill samples are simply negated from each other, and a histogram drawn and a gaussian trained on those differences. The resulting plot is shown in Figure \ref{fig:td_3}.
+\subsection{Skill comparison}
+As there is a non-zero diagonal term in the covariance matrix in method 2, and a visible correlation in the figure, method 2 is preferred over method 1. The direct method also requires a lot of samples to avoid significant noise in the probabilties. For a real life task, therefore, when computation time is at a premium, the best is method two.
+
+The skill probabilities are therefore calculated in a very similar manner to that in Section \ref{sec:c}, but the formula must be changed to include the diagonal covariance terms, leading to Equation \ref{eqn:td_skills}. A similar table is then generated as seen in Table \ref{tab:taskd_skill}, with the diagonals set to 0.5. This is very close to the table produced in Section \ref{sec:c}, and the (very small) differences are shown in Table \ref{tab:taskd_diff}. Both methods produce very similar results and are therefore producing very similar distributions.
+
+\begin{equation}
+    p(w_i > w_j) = p(w_j-w_i < 0) =\Phi\left(\frac{ \mu_i - \mu_j }{\sigma_i^2 - 2\sigma_ij^{2}+\sigma_j^2}\right) \label{eqn:td_skills}
+\end{equation}
 
 
+\begin{table}
+    \centering{}
+    \begin{minipage}[t]{0.495\textwidth}
+        \begin{center}
+            \begin{tabular}{lcccc}\toprule
+                ---         & D     & N     & F     & M     \\ \midrule
+                Djokovic(D) & 0.500 & 0.957 & 0.922 & 0.982 \\
+                Nadal(N)    & 0.043 & 0.500 & 0.377 & 0.736 \\
+                Federer(F)  & 0.078 & 0.623 & 0.500 & 0.801 \\
+                Murray(M)   & 0.018 & 0.264 & 0.199 & 0.500 \\\bottomrule
+            \end{tabular}%
+            \par\end{center}
+        \caption{Skill Probabilities}    \label{tab:taskd_skill}
+        %
+    \end{minipage}%
+    \begin{minipage}[t]{0.495\textwidth}%
+        \begin{center}
+            \begin{tabular}{lcccc} \toprule
+                ---         & D      & N     & F      & M      \\ \midrule
+                Djokovic(D) & 0.000  & 0.017 & 0.014  & -0.003 \\
+                Nadal(N)    & -0.017 & 0.000 & -0.050 & -0.030 \\
+                Federer(F)  & -0.014 & 0.050 & 0.000  & -0.010 \\
+                Murray(M)   & 0.003  & 0.030 & 0.010  & 0.000  \\ \bottomrule
+            \end{tabular}
+            \par\end{center}
+        \caption{Difference to Table \ref{tab:skill_prob}} \label{tab:taskd_diff}
+        %
+    \end{minipage}%
+\end{table}
 
-\section{Task E}
+
+\section{Task E: Player Ranking Comparisons} \label{sec:e}
+\subsection{Empirical Game Outcome Averages}
+The ranking is found by finding the total number of games won by each player, and ranking the players by their win ratio, which has the underlying assumption that the probability of winning a game is the same regardless of the opponent played against.
+\subsection{Gibbs Sampling}
+After the gibbs sampling exercises from previous tasks it is easy to empirically calculate the mean and variance for each player, as was done when calculating the marginals in Section \ref{sec:d}.
+\subsection{Message Passing Algorithm}
+The algorithm is run for enough iterations to converge ($\geq 6$) which returns the means and precisions directly.
+
+The mean and $\pm\sigma$ error bars for the probability of winning against a randomly chosen player for all three methods are shown in Figure \ref{fig:te}, ranked by the message passing algorithm generated means. There are a few obvious issues with the empirical game outcome average results. Firstly the range in the means is a lot lower than the other algorithms, further reinforcing the point from section \ref{sec:d} that a far greater amount of data than we have is needed to ensure convergence. More importantly, players cannot be compared if they have the same win ratio. This is clearest for players who have won no games. Intuitively, players who have lost against harder players are maybe more likely to be better than players who have lost against players who are proven to be bad from other results. This explains why there are players with a win ratio of 0 who are in the middle of the ranking when ranked by the EP process. The win ratio method does not take into account anything about the skill of opponents.
+
+The EP and Gibbs results give broadly similar results. The shape of the means is the same, the means of the two processes seem separated by a constant over all players, but the ranking overall is very similar. The constant arises from the prior over the skills. The variances in EP and Gibbs also match closely, showing again that the two methods result in similar distributions. The players with a win ratio of 0 have a larger variance in both the Gibbs and EP processes also, reinforcing the lack of information gained about their skill.
+\begin{figure}[]
+    \centering
+    \includegraphics[width=0.99\textwidth]{../plots/taske.png}
+    \caption{Player Rankings}
+    \label{fig:te}
+\end{figure}
+
+
 
 
 % \renewcommand{\thepage}{A\arabic{page}} 
